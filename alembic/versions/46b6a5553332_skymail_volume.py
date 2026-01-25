@@ -1,8 +1,8 @@
-"""initial schema
+"""SkyMail volume
 
-Revision ID: 46199e99c68a
+Revision ID: 46b6a5553332
 Revises: 
-Create Date: 2026-01-24 17:07:24.305365
+Create Date: 2026-01-25 16:06:28.400742
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '46199e99c68a'
+revision: str = '46b6a5553332'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -28,8 +28,10 @@ def upgrade() -> None:
     sa.Column('password_hash', sa.String(), nullable=False),
     sa.Column('company_name', sa.String(length=255), nullable=False),
     sa.Column('website_url', sa.String(length=500), nullable=True),
+    sa.Column('profile_image_key', sa.String(length=500), nullable=True),
     sa.Column('is_verified', sa.Boolean(), nullable=False),
     sa.Column('is_premium', sa.Boolean(), nullable=False),
+    sa.Column('subscriber_count', sa.Integer(), nullable=False),
     sa.Column('subscription_tier', sa.String(length=20), nullable=False),
     sa.Column('subscription_end_date', sa.DateTime(), nullable=True),
     sa.Column('max_subscribers', sa.Integer(), nullable=False),
@@ -39,12 +41,24 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_companies_email'), 'companies', ['email'], unique=True)
     op.create_index(op.f('ix_companies_username'), 'companies', ['username'], unique=True)
+    op.create_table('refresh_tokens',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('company_id', sa.UUID(), nullable=False),
+    sa.Column('token_hash', sa.Text(), nullable=False),
+    sa.Column('expires_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('revoked_at', sa.TIMESTAMP(timezone=True), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_refresh_tokens_company_id'), 'refresh_tokens', ['company_id'], unique=False)
     op.create_table('newsletter_templates',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('company_id', sa.UUID(), nullable=False),
-    sa.Column('name', sa.String(length=255), nullable=False),
-    sa.Column('html_content', sa.String(), nullable=True),
-    sa.Column('design_data', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('name', sa.String(length=100), nullable=False),
+    sa.Column('subject', sa.String(length=255), nullable=False),
+    sa.Column('html_content', sa.Text(), nullable=False),
+    sa.Column('text_content', sa.Text(), nullable=True),
+    sa.Column('variables', postgresql.JSONB(astext_type=sa.Text()), server_default='[]', nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(), server_default=sa.text('now()'), nullable=False),
@@ -72,13 +86,17 @@ def upgrade() -> None:
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('company_id', sa.UUID(), nullable=False),
     sa.Column('email', sa.String(length=255), nullable=False),
-    sa.Column('is_verified', sa.Boolean(), nullable=False),
-    sa.Column('is_active', sa.Boolean(), nullable=False),
-    sa.Column('subscribed_at', sa.TIMESTAMP(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('status', sa.String(length=20), nullable=False),
+    sa.Column('source_origin', sa.String(length=255), nullable=True),
+    sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('company_id', 'email')
+    sa.UniqueConstraint('company_id', 'email', name='uq_subscriber_company_email')
     )
+    op.create_index('idx_subscribers_company_id', 'subscribers', ['company_id'], unique=False)
+    op.create_index('idx_subscribers_email', 'subscribers', ['email'], unique=False)
+    op.create_index('idx_subscribers_status', 'subscribers', ['status'], unique=False)
     op.create_index(op.f('ix_subscribers_company_id'), 'subscribers', ['company_id'], unique=False)
     op.create_index(op.f('ix_subscribers_email'), 'subscribers', ['email'], unique=False)
     op.create_table('campaigns',
@@ -98,21 +116,56 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_campaigns_company_id'), 'campaigns', ['company_id'], unique=False)
+    op.create_table('newsletter_template_assets',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('company_id', sa.UUID(), nullable=False),
+    sa.Column('template_id', sa.UUID(), nullable=True),
+    sa.Column('file_url', sa.Text(), nullable=False),
+    sa.Column('file_type', sa.String(length=50), nullable=True),
+    sa.Column('created_at', sa.TIMESTAMP(), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['template_id'], ['newsletter_templates.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_newsletter_template_assets_company_id'), 'newsletter_template_assets', ['company_id'], unique=False)
+    op.create_index(op.f('ix_newsletter_template_assets_template_id'), 'newsletter_template_assets', ['template_id'], unique=False)
+    op.create_table('newsletter_template_versions',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('template_id', sa.UUID(), nullable=False),
+    sa.Column('subject', sa.String(length=255), nullable=False),
+    sa.Column('html_content', sa.Text(), nullable=False),
+    sa.Column('text_content', sa.Text(), nullable=True),
+    sa.Column('variables', postgresql.JSONB(astext_type=sa.Text()), server_default='[]', nullable=False),
+    sa.Column('created_at', sa.TIMESTAMP(), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['template_id'], ['newsletter_templates.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_newsletter_template_versions_template_id'), 'newsletter_template_versions', ['template_id'], unique=False)
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_index(op.f('ix_newsletter_template_versions_template_id'), table_name='newsletter_template_versions')
+    op.drop_table('newsletter_template_versions')
+    op.drop_index(op.f('ix_newsletter_template_assets_template_id'), table_name='newsletter_template_assets')
+    op.drop_index(op.f('ix_newsletter_template_assets_company_id'), table_name='newsletter_template_assets')
+    op.drop_table('newsletter_template_assets')
     op.drop_index(op.f('ix_campaigns_company_id'), table_name='campaigns')
     op.drop_table('campaigns')
     op.drop_index(op.f('ix_subscribers_email'), table_name='subscribers')
     op.drop_index(op.f('ix_subscribers_company_id'), table_name='subscribers')
+    op.drop_index('idx_subscribers_status', table_name='subscribers')
+    op.drop_index('idx_subscribers_email', table_name='subscribers')
+    op.drop_index('idx_subscribers_company_id', table_name='subscribers')
     op.drop_table('subscribers')
     op.drop_index(op.f('ix_payments_company_id'), table_name='payments')
     op.drop_table('payments')
     op.drop_index(op.f('ix_newsletter_templates_company_id'), table_name='newsletter_templates')
     op.drop_table('newsletter_templates')
+    op.drop_index(op.f('ix_refresh_tokens_company_id'), table_name='refresh_tokens')
+    op.drop_table('refresh_tokens')
     op.drop_index(op.f('ix_companies_username'), table_name='companies')
     op.drop_index(op.f('ix_companies_email'), table_name='companies')
     op.drop_table('companies')

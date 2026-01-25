@@ -22,8 +22,15 @@ class Company(Base):
     company_name: Mapped[str] = mapped_column(String(255), nullable=False)
     website_url: Mapped[str | None] = mapped_column(String(500))
 
+    profile_image_key: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True
+    )
+
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     is_premium: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    subscriber_count : Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     subscription_tier: Mapped[str] = mapped_column(String(20), default="free")
     subscription_end_date: Mapped[datetime.datetime | None]

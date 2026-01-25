@@ -13,6 +13,10 @@ from app.utils.jwt_handler import verify_token, TokenPayload
 from jose import JWTError
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+from app.database.database import get_db
+from app.modules.auth.password_reset.service import PasswordResetService
+from app.modules.auth.password_reset.schemas import PasswordResetRequest, PasswordResetVerify
+
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 security = HTTPBearer()
@@ -134,3 +138,43 @@ async def get_profile(
     db: Session = Depends(get_db)
 ):
     return await LoginHandler.get_profile(company_id, db)
+
+@router.post("/forgot-password")
+async def forgot_password(
+    request: PasswordResetRequest,
+    db: Session = Depends(get_db)
+):
+    """Request password reset - sends OTP to email"""
+    success, message = await PasswordResetService.request_password_reset(
+        request.email, db
+    )
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=message
+        )
+    
+    return {"message": message}
+
+
+@router.post("/reset-password")
+async def reset_password(
+    request: PasswordResetVerify,
+    db: Session = Depends(get_db)
+):
+    """Verify OTP and reset password"""
+    success, message = await PasswordResetService.verify_reset_otp_and_update_password(
+        request.email,
+        request.otp,
+        request.new_password,
+        db
+    )
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=message
+        )
+    
+    return {"message": message}

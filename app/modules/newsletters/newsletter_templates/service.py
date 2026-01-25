@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 from loguru import logger
 
+from app.modules.auth.model import Company
 from app.modules.newsletters.newsletter_templates.model import NewsletterTemplate
 from app.modules.newsletters.template_versions.model import NewsletterTemplateVersion
 from app.modules.newsletters.template_assets.model import TemplateAsset
@@ -29,6 +30,20 @@ class TemplateService:
         db: Session
     ) -> Tuple[bool, Optional[NewsletterTemplate], str]:
         try:
+            # Check if company is on free tier and already has a template
+            company = db.query(Company).filter(Company.id == uuid.UUID(company_id)).first()
+            if not company:
+                return False, None, "Company not found"
+            
+            if company.subscription_tier == "free":
+                # Free tier can only have 1 template
+                template_count = db.query(func.count(NewsletterTemplate.id)).filter(
+                    NewsletterTemplate.company_id == uuid.UUID(company_id)
+                ).scalar() or 0
+                
+                if template_count >= 1:
+                    return False, None, "Free tier limited to 1 template. Upgrade to premium for unlimited templates."
+            
             template_id = uuid.uuid4()
             
             new_template = NewsletterTemplate(
@@ -112,6 +127,17 @@ class TemplateService:
                 template.is_active = request.is_active
             
             if content_changed:
+                # Check free tier version limit
+                company = db.query(Company).filter(Company.id == uuid.UUID(company_id)).first()
+                if company and company.subscription_tier == "free":
+                    version_count = db.query(NewsletterTemplateVersion).filter(
+                        NewsletterTemplateVersion.template_id == uuid.UUID(template_id)
+                    ).count()
+                    
+                    if version_count >= 3:  # Free tier limit: 3 versions
+                        logger.warning(f"Free tier version limit exceeded for company {company_id}")
+                        return False, None, "Free tier limited to 3 versions per template"
+                
                 new_version = NewsletterTemplateVersion(
                     id=uuid.uuid4(),
                     template_id=uuid.UUID(template_id),

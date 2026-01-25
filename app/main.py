@@ -9,6 +9,9 @@ from app.redis.redis_manager import redis_manager
 from app.database.database import engine, SessionLocal, get_db
 from app.modules.auth.routes import router as auth_router
 from app.modules.newsletters.newsletter_templates.routes import router as newsletter_router
+from app.modules.subscribers.routes import public_router as subscription_router
+from app.modules.subscribers.routes import protected_router as subscriber_management_router
+from app.modules.billing.routes import router as billing_router
 from app.utils import constants
 
 
@@ -89,6 +92,15 @@ app.include_router(auth_router)
 
 # Include newsletter routes
 app.include_router(newsletter_router)
+
+# Include public subscription routes (CORS enabled)
+app.include_router(subscription_router)
+
+# Include protected subscriber management routes
+app.include_router(subscriber_management_router)
+
+# Include billing routes
+app.include_router(billing_router)
 
 # ==================== ROOT ENDPOINT ====================
 

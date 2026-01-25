@@ -51,10 +51,10 @@ PASSWORD_RATE_LIMIT_PERIOD = int(os.getenv("PASSWORD_RATE_LIMIT_PERIOD", 300))
 # ======================== RAZORPAY CONFIGURATION ========================
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_SECRET_KEY = os.getenv("RAZORPAY_SECRET_KEY")
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
 
 # ======================== AWS S3 CONFIGURATION ========================
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_S3_BUCKET = os.getenv("AWS_S3_BUCKET")
-AWS_S3_REGION = os.getenv("AWS_S3_REGION", "us-east-1")
-
+AWS_S3_REGION = os.getenv("AWS_S3_REGION", "us-east-1") 

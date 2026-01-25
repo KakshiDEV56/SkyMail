@@ -24,6 +24,87 @@ services:
       - my-network  
     command: ["redis-server", "--appendonly", "yes"]
 
+  # Celery Beat Scheduler
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: skymail-celery-beat
+    command: celery -A app.celery_app beat --loglevel=info
+    environment:
+      PYTHONUNBUFFERED: 1
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_SES_REGION: ${AWS_SES_REGION:-us-east-1}
+      AWS_SES_SENDER_EMAIL: ${AWS_SES_SENDER_EMAIL}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - my-network
+    restart: unless-stopped
+
+  # Celery Worker - Campaigns
+  celery-worker-campaigns:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: skymail-celery-worker-campaigns
+    command: celery -A app.celery_app worker -Q scheduled,campaigns --loglevel=info
+    environment:
+      PYTHONUNBUFFERED: 1
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_SES_REGION: ${AWS_SES_REGION:-us-east-1}
+      AWS_SES_SENDER_EMAIL: ${AWS_SES_SENDER_EMAIL}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - my-network
+    restart: unless-stopped
+
+  # Celery Worker - Email Batches
+  celery-worker-email-batches:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: skymail-celery-worker-email-batches
+    command: celery -A app.celery_app worker -Q email_batches --loglevel=info -c 4
+    environment:
+      PYTHONUNBUFFERED: 1
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_SES_REGION: ${AWS_SES_REGION:-us-east-1}
+      AWS_SES_SENDER_EMAIL: ${AWS_SES_SENDER_EMAIL}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - my-network
+    restart: unless-stopped
+
 volumes:
   pgdata:
     name: skymail_pgdata

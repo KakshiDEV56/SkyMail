@@ -35,7 +35,12 @@ SQLALCHEMY_DATABASE_URL = (
 ) 
 
 # ======================== REDIS CONFIGURATION ========================
-REDIS_URL = os.getenv("REDIS_URL")
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+# ======================== CELERY CONFIGURATION ========================
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/1")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/2")
+CELERY_BEAT_SCHEDULE_DB = os.getenv("CELERY_BEAT_SCHEDULE_DB", "/tmp/celerybeat-schedule")
 
 # ======================== MAIL SERVER CONFIGURATION ========================
 MAIL_USERNAME = os.getenv("MAIL_USERNAME")
@@ -53,8 +58,19 @@ RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_SECRET_KEY = os.getenv("RAZORPAY_SECRET_KEY")
 RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
 
-# ======================== AWS S3 CONFIGURATION ========================
+# ======================== AWS CONFIGURATION ========================
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_S3_BUCKET = os.getenv("AWS_S3_BUCKET")
-AWS_S3_REGION = os.getenv("AWS_S3_REGION", "us-east-1") 
+AWS_S3_REGION = os.getenv("AWS_S3_REGION", "us-east-1")
+
+# ======================== AWS SES CONFIGURATION ========================
+AWS_SES_REGION = os.getenv("AWS_SES_REGION", "us-east-1")
+AWS_SES_SENDER_EMAIL = os.getenv("AWS_SES_SENDER_EMAIL")
+AWS_SES_CONFIGURATION_SET = os.getenv("AWS_SES_CONFIGURATION_SET", "skymail-events")
+
+# ======================== CAMPAIGN CONFIGURATION ========================
+CAMPAIGN_BATCH_SIZE = int(os.getenv("CAMPAIGN_BATCH_SIZE", "100"))
+CAMPAIGN_SCHEDULER_INTERVAL_SECONDS = int(os.getenv("CAMPAIGN_SCHEDULER_INTERVAL_SECONDS", "60"))
+SES_SEND_RATE_LIMIT = int(os.getenv("SES_SEND_RATE_LIMIT", "14"))  # emails per second
+ 

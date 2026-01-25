@@ -12,6 +12,7 @@ from app.modules.newsletters.newsletter_templates.routes import router as newsle
 from app.modules.subscribers.routes import public_router as subscription_router
 from app.modules.subscribers.routes import protected_router as subscriber_management_router
 from app.modules.billing.routes import router as billing_router
+from app.modules.campaign.routes import router as campaign_router
 from app.utils import constants
 
 
@@ -92,6 +93,9 @@ app.include_router(auth_router)
 
 # Include newsletter routes
 app.include_router(newsletter_router)
+
+# Include campaign routes
+app.include_router(campaign_router)
 
 # Include public subscription routes (CORS enabled)
 app.include_router(subscription_router)

@@ -2,12 +2,19 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { templatesApi } from "@/lib/api/templates";
-import { Loader2, Trash2, Edit, Eye } from "lucide-react";
+import { Loader2, Trash2, Edit, Eye, AlertTriangle, Calendar, Info } from "lucide-react";
 import { useState } from "react";
 
 interface TemplateListProps {
   onEdit?: (templateId: string) => void;
   onView?: (templateId: string) => void;
+}
+
+interface AffectedCampaign {
+  id: string;
+  name: string;
+  status: string;
+  scheduled_for: string | null;
 }
 
 export function TemplateList({
@@ -16,6 +23,17 @@ export function TemplateList({
 }: TemplateListProps) {
   const queryClient = useQueryClient();
   const [errorMessage, setErrorMessage] = useState("");
+  const [deleteConfirmDialog, setDeleteConfirmDialog] = useState<{
+    open: boolean;
+    templateId: string | null;
+    templateName: string | null;
+    affectedCampaigns: AffectedCampaign[];
+  }>({
+    open: false,
+    templateId: null,
+    templateName: null,
+    affectedCampaigns: [],
+  });
 
   const { data: templatesData, isLoading } = useQuery({
     queryKey: ["templates"],
@@ -26,7 +44,14 @@ export function TemplateList({
     mutationFn: (templateId: string) => templatesApi.deleteTemplate(templateId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["templates"] });
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
       setErrorMessage("");
+      setDeleteConfirmDialog({
+        open: false,
+        templateId: null,
+        templateName: null,
+        affectedCampaigns: [],
+      });
     },
     onError: (error: any) => {
       setErrorMessage(
@@ -35,9 +60,19 @@ export function TemplateList({
     },
   });
 
-  const handleDelete = (templateId: string) => {
-    if (confirm("Are you sure you want to delete this template?")) {
-      deleteTemplateMutation.mutate(templateId);
+  const handleDeleteClick = (templateId: string, templateName: string) => {
+    // Show confirmation dialog - deletion happens when user confirms
+    setDeleteConfirmDialog({
+      open: true,
+      templateId,
+      templateName,
+      affectedCampaigns: [], // We'll populate this after deletion with the API response info
+    });
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmDialog.templateId) {
+      deleteTemplateMutation.mutate(deleteConfirmDialog.templateId);
     }
   };
 
@@ -123,7 +158,7 @@ export function TemplateList({
                 Edit
               </button>
               <button
-                onClick={() => handleDelete(template.id)}
+                onClick={() => handleDeleteClick(template.id, template.name)}
                 disabled={deleteTemplateMutation.isPending}
                 className="flex items-center justify-center px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
               >
@@ -138,6 +173,114 @@ export function TemplateList({
       {templatesData.total > 0 && (
         <div className="text-sm text-gray-600 text-center">
           Showing {templatesData.items.length} of {templatesData.total} templates
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmDialog.open && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Delete Template</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Are you sure you want to delete <strong>{deleteConfirmDialog.templateName}</strong>?
+                </p>
+              </div>
+            </div>
+
+            {/* Affected Campaigns Warning */}
+            {deleteConfirmDialog.affectedCampaigns && deleteConfirmDialog.affectedCampaigns.length > 0 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-2 mb-3">
+                  <Info className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-orange-900">
+                      ⚠️ {deleteConfirmDialog.affectedCampaigns.length} Campaign(s) will be deleted
+                    </p>
+                    <p className="text-sm text-orange-800 mt-1">
+                      The following campaigns use this template and will be permanently deleted:
+                    </p>
+                  </div>
+                </div>
+
+                {/* List of Affected Campaigns */}
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {deleteConfirmDialog.affectedCampaigns.map((campaign) => (
+                    <div
+                      key={campaign.id}
+                      className="bg-white rounded p-3 border border-orange-100"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-900 truncate">
+                            {campaign.name}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                              campaign.status === 'scheduled'
+                                ? 'bg-blue-100 text-blue-700'
+                                : campaign.status === 'sent'
+                                ? 'bg-green-100 text-green-700'
+                                : campaign.status === 'sending'
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : 'bg-gray-100 text-gray-700'
+                            }`}>
+                              {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      {campaign.scheduled_for && (
+                        <div className="flex items-center gap-1 text-xs text-gray-600 mt-2">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(campaign.scheduled_for).toLocaleString("en-IN")}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* No Affected Campaigns */}
+            {deleteConfirmDialog.affectedCampaigns && deleteConfirmDialog.affectedCampaigns.length === 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <p className="text-sm text-green-800">
+                  ✓ No campaigns are using this template. It's safe to delete.
+                </p>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() =>
+                  setDeleteConfirmDialog({
+                    open: false,
+                    templateId: null,
+                    templateName: null,
+                    affectedCampaigns: [],
+                  })
+                }
+                disabled={deleteTemplateMutation.isPending}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleteTemplateMutation.isPending}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deleteTemplateMutation.isPending && (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                )}
+                {deleteTemplateMutation.isPending ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

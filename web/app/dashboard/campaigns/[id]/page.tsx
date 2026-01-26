@@ -35,6 +35,11 @@ export default function CampaignDetailsPage() {
   const [template, setTemplate] = useState<Template | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [newScheduledFor, setNewScheduledFor] = useState("");
+  const [newTimezone, setNewTimezone] = useState("UTC");
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [rescheduleError, setRescheduleError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCampaignData = async () => {
@@ -90,6 +95,51 @@ export default function CampaignDetailsPage() {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString();
+  };
+
+  const handleReschedule = async () => {
+    if (!newScheduledFor) {
+      setRescheduleError("Please select a date and time");
+      return;
+    }
+
+    setIsRescheduling(true);
+    setRescheduleError(null);
+
+    try {
+      const scheduledDateTime = new Date(newScheduledFor);
+      if (isNaN(scheduledDateTime.getTime())) {
+        throw new Error("Invalid date/time format");
+      }
+
+      const response = await apiClient.put(
+        `/api/campaigns/${campaignId}/reschedule`,
+        {
+          scheduled_for: scheduledDateTime.toISOString(),
+          send_timezone: newTimezone || "UTC",
+        }
+      );
+
+      // Update campaign state with new schedule
+      setCampaign((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          scheduled_for: response.data.scheduled_for,
+          send_timezone: response.data.send_timezone,
+        };
+      });
+
+      setShowRescheduleModal(false);
+      setNewScheduledFor("");
+      setNewTimezone("UTC");
+    } catch (err: any) {
+      setRescheduleError(
+        err.response?.data?.detail || "Failed to reschedule campaign"
+      );
+    } finally {
+      setIsRescheduling(false);
+    }
   };
 
   if (isLoading) {
@@ -258,6 +308,24 @@ export default function CampaignDetailsPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Reschedule Actions */}
+                {campaign.scheduled_for && (
+                  <div className="bg-white border border-gray-200 rounded-xl p-6">
+                    <h2 className="text-xl font-bold text-[#180D39] mb-4">Actions</h2>
+                    <div className="flex gap-4">
+                      <button
+                        onClick={() => setShowRescheduleModal(true)}
+                        className="px-6 py-2 bg-[#2A8C9D] text-white rounded-lg hover:bg-[#1D7A89]"
+                      >
+                        Reschedule Campaign
+                      </button>
+                      <button className="px-6 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50">
+                        Cancel Campaign
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Sidebar Info */}
@@ -303,6 +371,79 @@ export default function CampaignDetailsPage() {
           </div>
         </main>
       </div>
+
+      {/* Reschedule Modal */}
+      {showRescheduleModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold text-[#180D39] mb-4">Reschedule Campaign</h3>
+
+            {rescheduleError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <p className="text-sm text-red-700">{rescheduleError}</p>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#180D39] mb-2">
+                  New Scheduled Date & Time *
+                </label>
+                <input
+                  type="datetime-local"
+                  value={newScheduledFor}
+                  onChange={(e) => setNewScheduledFor(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2A8C9D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#180D39] mb-2">
+                  Timezone
+                </label>
+                <select
+                  value={newTimezone}
+                  onChange={(e) => setNewTimezone(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2A8C9D]"
+                >
+                  <option value="UTC">UTC</option>
+                  <option value="America/New_York">America/New_York</option>
+                  <option value="America/Chicago">America/Chicago</option>
+                  <option value="America/Denver">America/Denver</option>
+                  <option value="America/Los_Angeles">America/Los_Angeles</option>
+                  <option value="Europe/London">Europe/London</option>
+                  <option value="Europe/Paris">Europe/Paris</option>
+                  <option value="Asia/Tokyo">Asia/Tokyo</option>
+                  <option value="Asia/Kolkata">Asia/Kolkata</option>
+                  <option value="Australia/Sydney">Australia/Sydney</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => {
+                    setShowRescheduleModal(false);
+                    setNewScheduledFor("");
+                    setNewTimezone("UTC");
+                    setRescheduleError(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleReschedule}
+                  disabled={isRescheduling}
+                  className="flex-1 px-4 py-2 bg-[#2A8C9D] text-white rounded-lg font-medium hover:bg-[#1D7A89] disabled:opacity-50"
+                >
+                  {isRescheduling ? "Rescheduling..." : "Reschedule"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

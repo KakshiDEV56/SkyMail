@@ -188,7 +188,7 @@ class TemplateHandler:
         template_id: str,
         db: Session
     ):
-        success, message = await TemplateService.delete_template(
+        success, message, affected_campaigns = await TemplateService.delete_template(
             company_id, template_id, db
         )
         
@@ -198,7 +198,11 @@ class TemplateHandler:
                 detail=message
             )
         
-        return {"message": message}
+        return {
+            "message": message,
+            "affected_campaigns": affected_campaigns,
+            "deleted_campaigns_count": len(affected_campaigns)
+        }
 
     @staticmethod
     async def get_versions(

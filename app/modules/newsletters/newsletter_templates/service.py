@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Dict, Any
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
@@ -9,6 +9,7 @@ from app.modules.auth.model import Company
 from app.modules.newsletters.newsletter_templates.model import NewsletterTemplate
 from app.modules.newsletters.template_versions.model import NewsletterTemplateVersion
 from app.modules.newsletters.template_assets.model import TemplateAsset
+from app.modules.campaign.model import Campaign
 from app.modules.newsletters.newsletter_templates.schemas import (
     TemplateCreateRequest,
     TemplateUpdateRequest,
@@ -248,7 +249,11 @@ class TemplateService:
         company_id: str,
         template_id: str,
         db: Session
-    ) -> Tuple[bool, str]:
+    ) -> Tuple[bool, str, List[Dict[str, Any]]]:
+        """
+        Delete a template and cascade delete any campaigns using it.
+        Returns: (success, message, affected_campaigns)
+        """
         try:
             template = db.query(NewsletterTemplate).filter(
                 NewsletterTemplate.id == uuid.UUID(template_id),
@@ -256,18 +261,37 @@ class TemplateService:
             ).first()
             
             if not template:
-                return False, "Template not found"
+                return False, "Template not found", []
+            
+            # Get all campaigns using this template (will be cascade deleted)
+            affected_campaigns = db.query(Campaign).filter(
+                Campaign.template_id == uuid.UUID(template_id),
+                Campaign.company_id == uuid.UUID(company_id)
+            ).all()
+            
+            affected_campaign_data = [
+                {
+                    "id": str(camp.id),
+                    "name": camp.name,
+                    "status": camp.status,
+                    "scheduled_for": camp.scheduled_for.isoformat() if camp.scheduled_for else None
+                }
+                for camp in affected_campaigns
+            ]
             
             db.delete(template)
             db.commit()
             
-            logger.info(f"Template deleted: {template_id}")
-            return True, "Template deleted successfully"
+            logger.info(
+                f"Template deleted: {template_id}, "
+                f"affected campaigns: {len(affected_campaigns)}"
+            )
+            return True, "Template deleted successfully", affected_campaign_data
             
         except Exception as e:
             db.rollback()
             logger.error(f"Delete template error for {template_id}: {str(e)}")
-            return False, "Failed to delete template"
+            return False, "Failed to delete template", []
 
     @staticmethod
     async def get_template_versions(

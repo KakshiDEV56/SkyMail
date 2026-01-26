@@ -35,7 +35,7 @@ async def create_template(
         subject=subject,
         html_content=html_content,
         text_content=text_content,
-        constants=[v.strip() for v in constants.split(",") if v.strip()] if constants and constants.strip() else []
+        constants=[v.strip() for v in constants.split(",") if v.strip()] if constants else []
     )
     return await TemplateHandler.create_template_with_assets(
         company_id, request, files, db

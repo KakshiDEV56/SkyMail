@@ -54,12 +54,7 @@ export const templatesApi = {
   ): Promise<TemplateResponse> => {
     const response = await apiClient.post<TemplateResponse>(
       "/api/newsletters/templates",
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      }
+      formData
     );
     return response.data;
   },
@@ -70,12 +65,7 @@ export const templatesApi = {
   ): Promise<TemplateResponse> => {
     const response = await apiClient.put<TemplateResponse>(
       `/api/newsletters/templates/${templateId}`,
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      }
+      formData
     );
     return response.data;
   },
@@ -148,8 +138,19 @@ export const templatesApi = {
     return { items: [], total: 0, page, limit };
   },
 
-  deleteTemplate: async (templateId: string): Promise<{ message: string }> => {
-    const response = await apiClient.delete<{ message: string }>(
+  deleteTemplate: async (
+    templateId: string
+  ): Promise<{
+    message: string;
+    affected_campaigns: Array<{
+      id: string;
+      name: string;
+      status: string;
+      scheduled_for: string | null;
+    }>;
+    deleted_campaigns_count: number;
+  }> => {
+    const response = await apiClient.delete(
       `/api/newsletters/templates/${templateId}`
     );
     return response.data;

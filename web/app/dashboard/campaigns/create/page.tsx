@@ -159,19 +159,29 @@ export default function CreateCampaignPage() {
 
     setIsSubmitting(true);
     try {
-      const response = await apiClient.post("/api/campaigns", {
+      // Ensure scheduled_for is properly formatted as ISO string
+      const scheduledDateTime = new Date(scheduledFor);
+      if (isNaN(scheduledDateTime.getTime())) {
+        throw new Error("Invalid scheduled date/time");
+      }
+
+      const payload = {
         name: campaignName,
         template_id: selectedTemplate.id,
         constants_values: constantsValues,
-        scheduled_for: new Date(scheduledFor).toISOString(),
-        send_timezone: sendTimezone,
-      });
+        scheduled_for: scheduledDateTime.toISOString(),
+        send_timezone: sendTimezone || "UTC",
+      };
+
+      console.log("Submitting campaign:", payload);
+
+      const response = await apiClient.post("/api/campaigns", payload);
 
       // Redirect to campaign details
       router.push(`/dashboard/campaigns/${response.data.id}`);
     } catch (error: any) {
       console.error("Failed to create campaign:", error);
-      const message = error.response?.data?.detail || "Failed to create campaign";
+      const message = error.response?.data?.detail || error.message || "Failed to create campaign";
       setValidationErrors([{ field: "submit", message }]);
     } finally {
       setIsSubmitting(false);

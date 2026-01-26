@@ -28,6 +28,10 @@ export function Sidebar() {
       icon: Users,
       label: "Subscribers",
       href: "/dashboard/subscribers",
+      submenu: [
+        { label: "Manage Subscribers", href: "/dashboard/subscribers" },
+        { label: "Code Snippets", href: "/dashboard/subscribers/code-snippets" },
+      ],
     },
     {
       icon: CreditCard,

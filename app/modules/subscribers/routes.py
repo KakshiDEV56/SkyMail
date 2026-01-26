@@ -5,7 +5,7 @@ These routes are PUBLIC - no authentication required.
 They handle newsletter subscriptions from company websites.
 """
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, Header, HTTPException, status, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from loguru import logger
 
@@ -271,4 +271,149 @@ async def get_subscriber_stats(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch subscriber statistics"
+        )
+
+
+@protected_router.get(
+    "",
+    status_code=200,
+    summary="List company subscribers",
+    description="Get paginated list of subscribers for the authenticated company with optional search"
+)
+async def list_subscribers(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    email: str = Query(None),
+    company_id: str = Depends(get_current_company),
+    db: Session = Depends(get_db)
+):
+    """
+    List all subscribers for a company with pagination and optional search.
+    
+    Query Parameters:
+    - page: Page number (default: 1)
+    - limit: Items per page (default: 20, max: 100)
+    - email: Optional email search filter
+    
+    Returns:
+    - subscribers: List of subscriber objects
+    - total: Total subscriber count
+    - page: Current page number
+    - page_size: Items per page
+    """
+    from app.modules.subscribers.model import Subscriber
+    import uuid
+    
+    try:
+        # Validate pagination
+        page = max(1, page)
+        limit = min(100, max(1, limit))
+        skip = (page - 1) * limit
+        
+        # Build query
+        query = db.query(Subscriber).filter(
+            Subscriber.company_id == uuid.UUID(company_id)
+        )
+        
+        # Apply email filter if provided
+        if email:
+            query = query.filter(
+                Subscriber.subscriber_email.ilike(f"%{email}%")
+            )
+        
+        # Get total count
+        total = query.count()
+        
+        # Get paginated results
+        subscribers = query.order_by(
+            Subscriber.created_at.desc()
+        ).offset(skip).limit(limit).all()
+        
+        return {
+            "subscribers": [
+                {
+                    "id": str(sub.id),
+                    "email": sub.subscriber_email,
+                    "is_subscribed": sub.status == "subscribed",
+                    "subscribed_at": sub.created_at.isoformat(),
+                    "unsubscribed_at": None  # Could add unsubscribe timestamp if needed
+                }
+                for sub in subscribers
+            ],
+            "total": total,
+            "page": page,
+            "page_size": limit
+        }
+    
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid company ID"
+        )
+    except Exception as e:
+        logger.error(f"Error listing subscribers: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list subscribers"
+        )
+
+
+@protected_router.delete(
+    "/{subscriber_id}",
+    status_code=200,
+    summary="Delete a subscriber",
+    description="Delete a specific subscriber from the company's list"
+)
+async def delete_subscriber(
+    subscriber_id: str,
+    company_id: str = Depends(get_current_company),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a subscriber by ID.
+    
+    Parameters:
+    - subscriber_id: UUID of the subscriber to delete
+    
+    Returns:
+    - message: Success message
+    """
+    from app.modules.subscribers.model import Subscriber
+    import uuid
+    
+    try:
+        # Verify subscriber exists and belongs to the company
+        subscriber = db.query(Subscriber).filter(
+            Subscriber.id == uuid.UUID(subscriber_id),
+            Subscriber.company_id == uuid.UUID(company_id)
+        ).first()
+        
+        if not subscriber:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Subscriber not found"
+            )
+        
+        # Delete the subscriber
+        db.delete(subscriber)
+        db.commit()
+        
+        return {
+            "message": "Subscriber deleted successfully",
+            "subscriber_id": subscriber_id
+        }
+    
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid subscriber ID or company ID"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting subscriber: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete subscriber"
         )

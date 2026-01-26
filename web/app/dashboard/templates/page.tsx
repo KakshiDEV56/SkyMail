@@ -13,7 +13,6 @@ export default function TemplatesPage() {
   const [mode, setMode] = useState<"list" | "editor" | "viewer">("list");
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [viewingTemplateId, setViewingTemplateId] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleCreateNew = () => {
     setEditingTemplateId(null);
@@ -33,7 +32,7 @@ export default function TemplatesPage() {
   const handleTemplateSuccess = () => {
     setMode("list");
     setEditingTemplateId(null);
-    setRefreshKey((prev) => prev + 1);
+    // React Query cache invalidation will handle the UI update
   };
 
   const handleCancel = () => {
@@ -107,7 +106,6 @@ export default function TemplatesPage() {
 
             {mode === "list" && (
               <TemplateList
-                key={refreshKey}
                 onEdit={handleEditTemplate}
                 onView={handleViewTemplate}
               />

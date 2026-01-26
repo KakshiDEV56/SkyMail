@@ -242,3 +242,33 @@ async def get_campaign_status(
         raise HTTPException(status_code=404, detail=str(e))
     except AppPermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
+
+
+@router.delete("/{campaign_id}", status_code=204)
+async def delete_campaign(
+    campaign_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    company_id: uuid.UUID = Depends(get_current_company),
+):
+    """
+    Delete a campaign.
+    
+    Restrictions:
+    - Can only delete campaigns in draft or scheduled status
+    - Cannot delete campaigns that are sending or already sent
+    - All associated send logs will be deleted (cascade delete)
+    """
+    try:
+        company_uuid = uuid.UUID(company_id) if isinstance(company_id, str) else company_id
+        CampaignService.delete_campaign(
+            db=db,
+            company_id=company_uuid,
+            campaign_id=campaign_id,
+        )
+        return None
+    except ResourceNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except AppPermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))

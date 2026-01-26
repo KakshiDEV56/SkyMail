@@ -37,7 +37,7 @@ class Campaign(Base):
 
     template_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("newsletter_templates.id", ondelete="SET NULL"),
+        ForeignKey("newsletter_templates.id", ondelete="CASCADE"),
         nullable=True
     )
 

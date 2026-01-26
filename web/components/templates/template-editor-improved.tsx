@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { templatesApi } from "@/lib/api/templates";
 import { Loader2, AlertCircle, Upload, X, Eye, Edit3, ArrowLeft } from "lucide-react";
 
@@ -21,6 +21,8 @@ export function TemplateEditor({ templateId, onSuccess, onCancel }: TemplateEdit
   const [previewMode, setPreviewMode] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+
+  const queryClient = useQueryClient();
 
   // Load existing template if editing
   const { data: existingTemplate, isLoading: templateLoading } = useQuery({
@@ -93,21 +95,46 @@ export function TemplateEditor({ templateId, onSuccess, onCancel }: TemplateEdit
       setSuccessMessage(
         templateId ? "Template updated successfully!" : "Template created successfully!"
       );
+      
+      // Invalidate templates list cache to refresh the list view
+      queryClient.invalidateQueries({ queryKey: ["templates"] });
+      
+      // If updating, also invalidate the individual template cache
+      if (templateId) {
+        queryClient.invalidateQueries({ queryKey: ["template", templateId] });
+      }
+      
       setTimeout(() => {
         onSuccess?.();
       }, 1500);
     },
     onError: (error: any) => {
-      setErrorMessage(
-        error.response?.data?.detail || "Failed to save template. Please try again."
-      );
+      let errorMsg = "Failed to save template. Please try again.";
+      
+      // Handle different error response formats
+      if (error.response?.data?.detail) {
+        errorMsg = error.response.data.detail;
+      } else if (Array.isArray(error.response?.data)) {
+        // Pydantic validation errors are arrays of objects
+        errorMsg = error.response.data
+          .map((e: any) => e.msg || e.message || "Unknown error")
+          .join(", ");
+      } else if (typeof error.response?.data === 'string') {
+        errorMsg = error.response.data;
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+      
+      setErrorMessage(errorMsg);
     },
   });
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    setSelectedFiles((prev) => [...prev, ...files]);
-    setErrorMessage("");
+    if (files.length > 0) {
+      setSelectedFiles((prev) => [...prev, ...files]);
+      setErrorMessage("");
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -131,6 +158,20 @@ export function TemplateEditor({ templateId, onSuccess, onCancel }: TemplateEdit
   };
 
   const handlePublish = () => {
+    // Validate required fields
+    if (!templateName.trim()) {
+      setErrorMessage("Template name is required");
+      return;
+    }
+    if (!templateSubject.trim()) {
+      setErrorMessage("Email subject is required");
+      return;
+    }
+    if (!htmlContent.trim()) {
+      setErrorMessage("HTML content is required");
+      return;
+    }
+    
     setErrorMessage("");
     setSuccessMessage("");
 
@@ -193,7 +234,7 @@ export function TemplateEditor({ templateId, onSuccess, onCancel }: TemplateEdit
       </div>
 
       {/* Error Message */}
-      {errorMessage && (
+      {errorMessage && typeof errorMessage === 'string' && (
         <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
           <AlertCircle size={20} />
           <p>{errorMessage}</p>
@@ -353,37 +394,30 @@ export function TemplateEditor({ templateId, onSuccess, onCancel }: TemplateEdit
               <h3 className="text-lg font-semibold text-gray-900">Upload Assets</h3>
 
               {/* Drag & Drop */}
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-teal-500 transition"
-              >
-                <Upload size={32} className="mx-auto text-gray-400 mb-2" />
-                <p className="text-sm font-medium text-gray-900">
-                  Drop files here or click to upload
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  PNG, JPG, GIF up to 5MB each
-                </p>
-                <input
-                  type="file"
-                  onChange={handleFileSelect}
-                  multiple
-                  accept="image/*"
-                  className="hidden"
-                  id="file-input"
-                />
-                <label htmlFor="file-input" className="cursor-pointer">
-                  <input
-                    type="file"
-                    onChange={handleFileSelect}
-                    multiple
-                    accept="image/*"
-                    className="hidden"
-                  />
-                </label>
-              </div>
+              <label htmlFor="file-input-assets" className="block">
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-teal-500 transition"
+                >
+                  <Upload size={32} className="mx-auto text-gray-400 mb-2" />
+                  <p className="text-sm font-medium text-gray-900">
+                    Drop files here or click to upload
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    PNG, JPG, GIF up to 5MB each
+                  </p>
+                </div>
+              </label>
+              <input
+                id="file-input-assets"
+                type="file"
+                onChange={handleFileSelect}
+                multiple
+                accept="image/*"
+                className="hidden"
+              />
 
               {/* Selected Files */}
               {selectedFiles.length > 0 && (

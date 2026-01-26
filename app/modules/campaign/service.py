@@ -462,3 +462,50 @@ class CampaignService:
             "scheduled_for": campaign.scheduled_for,
             "sent_at": campaign.sent_at,
         }
+
+    @staticmethod
+    def delete_campaign(
+        db: Session,
+        company_id: uuid.UUID,
+        campaign_id: uuid.UUID,
+    ) -> None:
+        """
+        Delete a campaign.
+        
+        Restrictions:
+        - Can only delete campaigns in draft or scheduled status
+        - Cannot delete campaigns that are sending or already sent
+        - All campaign send logs will be cascade deleted
+        
+        Args:
+            db: Database session
+            company_id: Owner company ID
+            campaign_id: Campaign ID to delete
+            
+        Raises:
+            ResourceNotFoundError: If campaign not found
+            AppPermissionError: If campaign doesn't belong to company or cannot be deleted
+        """
+        campaign = db.execute(
+            select(Campaign).where(
+                and_(
+                    Campaign.id == campaign_id,
+                    Campaign.company_id == company_id,
+                )
+            )
+        ).scalar_one_or_none()
+        
+        if not campaign:
+            raise ResourceNotFoundError(f"Campaign {campaign_id} not found")
+        
+        # Prevent deletion of campaigns that are sending or already sent
+        if campaign.status in ["sending", "sent"]:
+            raise AppPermissionError(
+                f"Cannot delete campaign in '{campaign.status}' status. "
+                f"Only draft and scheduled campaigns can be deleted."
+            )
+        
+        db.delete(campaign)
+        db.commit()
+        
+        logger.info(f"Campaign deleted: {campaign_id} (status: {campaign.status})")

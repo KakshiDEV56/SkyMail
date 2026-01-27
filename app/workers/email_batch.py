@@ -19,8 +19,8 @@ from app.utils import constants
 ses_client = boto3.client(
     "ses",
     region_name=constants.AWS_SES_REGION,
-    aws_access_key_id=constants.AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=constants.AWS_SECRET_ACCESS_KEY,
+    aws_access_key_id=constants.AWS_SES_ACCESS_KEY_ID,
+    aws_secret_access_key=constants.AWS_SES_SECRET_ACCESS_KEY,
 )
 
 
@@ -85,12 +85,40 @@ def send_campaign_batch(self, campaign_id: str, subscriber_emails: list):
         
         logger.info(f"📄 Using template: {template.name}")
         
+        # ======================== FETCH COMPANY DATA ========================
+        
+        from app.modules.auth.model import Company
+        
+        company = db.execute(
+            select(Company).where(Company.id == campaign.company_id)
+        ).scalar_one_or_none()
+        
+        if not company:
+            logger.error(f"❌ Company {campaign.company_id} not found")
+            return {"status": "error", "reason": "company_not_found"}
+        
+        # ======================== FETCH TEMPLATE ASSETS ========================
+        
+        from app.modules.newsletters.template_assets.model import TemplateAsset
+        
+        template_assets = db.execute(
+            select(TemplateAsset).where(
+                (TemplateAsset.template_id == campaign.template_id)
+                & (TemplateAsset.company_id == campaign.company_id)
+            )
+        ).scalars().all()
+        
+        # Build template_asset string (comma-separated URLs)
+        template_asset_urls = ",".join([asset.file_url for asset in template_assets]) if template_assets else ""
+        
+        logger.debug(f"📦 Found {len(template_assets)} template assets")
+        
         # ======================== PREPARE EMAIL DETAILS ========================
         
         from_email = constants.AWS_SES_SENDER_EMAIL or constants.MAIL_FROM
-        subject = campaign.subject or template.subject
-        html_content = template.html_content
-        text_content = template.text_content
+        campaign_subject = campaign.subject or template.subject
+        template_html = template.html_content
+        template_text = template.text_content
         
         if not from_email:
             logger.error("❌ AWS_SES_SENDER_EMAIL not configured")
@@ -118,6 +146,54 @@ def send_campaign_batch(self, campaign_id: str, subscriber_emails: list):
                     sent_count += 1
                     continue
                 
+                # ======================== FETCH SUBSCRIBER DATA ========================
+                
+                from app.modules.subscribers.model import Subscriber
+                
+                subscriber = db.execute(
+                    select(Subscriber).where(
+                        (Subscriber.company_id == campaign.company_id)
+                        & (Subscriber.subscriber_email == email)
+                    )
+                ).scalar_one_or_none()
+                
+                # ======================== BUILD RENDER CONTEXT ========================
+                # Merge system variables (from DB) + campaign constants (manual values) + template assets
+                
+                render_context = {
+                    # System variables (auto-resolved)
+                    "company_name": company.company_name,
+                    "website_url": company.website_url or "",
+                    "subscriber_email": email,
+                    "subscriber_username": subscriber.subscriber_name if subscriber else email.split("@")[0],
+                    "template_asset": template_asset_urls,
+                    # Campaign constants (manual values provided at creation)
+                    **(campaign.constants_values or {})
+                }
+                
+                logger.debug(f"🔍 Render context: {render_context}")
+                
+                # ======================== RENDER TEMPLATE ========================
+                
+                rendered_subject = campaign_subject
+                rendered_html = template_html
+                rendered_text = template_text if template_text else ""
+                
+                # Replace all {{variable_name}} placeholders
+                for key, value in render_context.items():
+                    placeholder = f"{{{{{key}}}}}"
+                    rendered_subject = rendered_subject.replace(placeholder, str(value))
+                    rendered_html = rendered_html.replace(placeholder, str(value))
+                    rendered_text = rendered_text.replace(placeholder, str(value))
+                
+                # Check for unresolved variables
+                import re
+                unresolved = re.findall(r"\{\{(\w+)\}\}", rendered_html)
+                if unresolved:
+                    logger.warning(f"⚠️ Unresolved variables in template: {unresolved}")
+                
+                logger.info(f"✅ Template rendered for {email}")
+                
                 # Create or update send log
                 send_log_id = existing_log.id if existing_log else uuid.uuid4()
                 
@@ -126,12 +202,11 @@ def send_campaign_batch(self, campaign_id: str, subscriber_emails: list):
                     Source=from_email,
                     Destination={"ToAddresses": [email]},
                     Message={
-                        "Subject": {"Data": subject, "Charset": "UTF-8"},
+                        "Subject": {"Data": rendered_subject, "Charset": "UTF-8"},
                         "Body": {
-                            "Html": {"Data": html_content, "Charset": "UTF-8"},
+                            "Html": {"Data": rendered_html, "Charset": "UTF-8"},
                         },
                     },
-                    ConfigurationSetName=constants.AWS_SES_CONFIGURATION_SET,
                 )
                 
                 ses_message_id = response["MessageId"]
@@ -195,8 +270,6 @@ def send_campaign_batch(self, campaign_id: str, subscriber_emails: list):
                     logger.warning(f"⏱️ SES throttled, retrying batch in 30 seconds")
                     db.commit()
                     raise self.retry(countdown=30)
-                elif error_code == "ConfigurationSetDoesNotExist":
-                    logger.error(f"❌ Configuration set {constants.AWS_SES_CONFIGURATION_SET} not found")
             
             except Exception as exc:
                 logger.error(f"❌ Unexpected error sending to {email}: {str(exc)}")

@@ -118,4 +118,51 @@ export const campaignsApi = {
       throw error;
     }
   },
-};
+
+  /**
+   * Schedule a draft campaign
+   * Transitions campaign from draft to scheduled status
+   */
+  scheduleCampaign: async (
+    campaignId: string,
+    scheduledFor: string,
+    sendTimezone?: string
+  ): Promise<CampaignResponse> => {
+    try {
+      const response = await apiClient.post<CampaignResponse>(
+        `/api/campaigns/${campaignId}/schedule`,
+        {
+          scheduled_for: scheduledFor,
+          send_timezone: sendTimezone,
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error scheduling campaign:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Reschedule a scheduled campaign
+   * Updates the scheduled_for timestamp
+   */
+  rescheduleCampaign: async (
+    campaignId: string,
+    scheduledFor: string,
+    sendTimezone?: string
+  ): Promise<CampaignResponse> => {
+    try {
+      const response = await apiClient.patch<CampaignResponse>(
+        `/api/campaigns/${campaignId}/reschedule`,
+        {
+          scheduled_for: scheduledFor,
+          send_timezone: sendTimezone,
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error rescheduling campaign:", error);
+      throw error;
+    }
+  },};

@@ -358,6 +358,33 @@ export function TemplateEditor({ templateId, onSuccess, onCancel }: TemplateEdit
                 </p>
               </div>
 
+              {/* Variables Guideline */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-semibold text-blue-900 mb-3">📋 Available Variables & Usage Guide</h4>
+                <div className="space-y-3 text-sm text-blue-800">
+                  <div>
+                    <p className="font-medium">System Variables (Auto-filled):</p>
+                    <ul className="list-disc list-inside mt-1 space-y-1 text-blue-700">
+                      <li><code className="bg-blue-100 px-1.5 py-0.5 rounded">{"{{company_name}}"}</code> - Your company name</li>
+                      <li><code className="bg-blue-100 px-1.5 py-0.5 rounded">{"{{website_url}}"}</code> - Your website URL</li>
+                      <li><code className="bg-blue-100 px-1.5 py-0.5 rounded">{"{{subscriber_email}}"}</code> - Subscriber's email</li>
+                      <li><code className="bg-blue-100 px-1.5 py-0.5 rounded">{"{{subscriber_username}}"}</code> - Subscriber's name</li>
+                      <li><code className="bg-blue-100 px-1.5 py-0.5 rounded">{"{{template_asset}}"}</code> - URLs of uploaded assets (comma-separated)</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="font-medium">Custom Variables:</p>
+                    <p className="text-blue-700 mt-1">Define your own variables in the "Template Constants" field above, then use them as <code className="bg-blue-100 px-1.5 py-0.5 rounded">{"{{variable_name}}"}</code></p>
+                  </div>
+                  <div>
+                    <p className="font-medium">Example:</p>
+                    <code className="bg-blue-100 px-1 py-0.5 rounded text-xs text-blue-900 block mt-1">
+                      {"Hello {{subscriber_username}}, Check out our special offer: {{discount}}% off at {{website_url}}"}
+                    </code>
+                  </div>
+                </div>
+              </div>
+
               {/* HTML Content */}
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-2">

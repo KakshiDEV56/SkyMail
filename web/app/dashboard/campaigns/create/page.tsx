@@ -24,7 +24,7 @@ interface ValidationError {
 
 export default function CreateCampaignPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"template" | "constants" | "metadata" | "review">("template");
+  const [step, setStep] = useState<"template" | "constants" | "metadata" | "schedule" | "review">("template");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [constantsValues, setConstantsValues] = useState<Record<string, string>>({});
@@ -118,6 +118,14 @@ export default function CreateCampaignPage() {
       errors.push({ field: "name", message: "Campaign name is required" });
     }
 
+    setValidationErrors(errors);
+    return errors.length === 0;
+  };
+
+  // Validate schedule step
+  const validateScheduleStep = (): boolean => {
+    const errors: ValidationError[] = [];
+
     if (!scheduledFor) {
       errors.push({ field: "scheduled_for", message: "Scheduled time is required" });
     } else {
@@ -136,12 +144,15 @@ export default function CreateCampaignPage() {
   const handleNextStep = () => {
     if (step === "constants" && !validateConstantsStep()) return;
     if (step === "metadata" && !validateMetadataStep()) return;
+    if (step === "schedule" && !validateScheduleStep()) return;
 
     if (step === "template") {
       setStep("constants");
     } else if (step === "constants") {
       setStep("metadata");
     } else if (step === "metadata") {
+      setStep("schedule");
+    } else if (step === "schedule") {
       // Generate preview data
       setPreviewData({
         subscriber_name: "John Doe",
@@ -210,7 +221,7 @@ export default function CreateCampaignPage() {
                 Back to Campaigns
               </Link>
               <h1 className="text-3xl font-bold text-[#180D39]">Create Campaign</h1>
-              <p className="text-gray-600 mt-2">Step {["template", "constants", "metadata", "review"].indexOf(step) + 1} of 4</p>
+              <p className="text-gray-600 mt-2">Step {["template", "constants", "metadata", "schedule", "review"].indexOf(step) + 1} of 5</p>
             </div>
 
             <div className="bg-white border border-gray-200 rounded-xl p-8">
@@ -423,7 +434,45 @@ export default function CreateCampaignPage() {
                         {selectedTemplate?.subject}
                       </div>
                     </div>
+                  </div>
 
+                  <div className="flex justify-between gap-4 mt-8">
+                    <button
+                      onClick={() => setStep("constants")}
+                      className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handleNextStep}
+                      className="px-6 py-2 bg-[#2A8C9D] text-white rounded-lg hover:bg-[#1D7A89]"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 4: Schedule Campaign */}
+              {step === "schedule" && (
+                <div>
+                  <h2 className="text-2xl font-bold text-[#180D39] mb-6">Schedule Campaign</h2>
+
+                  {validationErrors.length > 0 && (
+                    <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex gap-3">
+                      <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                      <div>
+                        <h3 className="font-bold text-red-900">Please fix these errors:</h3>
+                        <ul className="text-sm text-red-700 mt-2 space-y-1">
+                          {validationErrors.map((error) => (
+                            <li key={error.field}>• {error.message}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-[#180D39] mb-2">
                         Schedule Time (UTC) <span className="text-red-500">*</span>
@@ -464,7 +513,7 @@ export default function CreateCampaignPage() {
 
                   <div className="flex justify-between gap-4 mt-8">
                     <button
-                      onClick={() => setStep("constants")}
+                      onClick={() => setStep("metadata")}
                       className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                     >
                       Back
@@ -479,7 +528,7 @@ export default function CreateCampaignPage() {
                 </div>
               )}
 
-              {/* Step 4: Review & Submit */}
+              {/* Step 5: Review & Submit */}
               {step === "review" && (
                 <div>
                   <h2 className="text-2xl font-bold text-[#180D39] mb-6">Review Campaign</h2>
@@ -586,7 +635,7 @@ export default function CreateCampaignPage() {
 
                   <div className="flex justify-between gap-4 mt-8">
                     <button
-                      onClick={() => setStep("metadata")}
+                      onClick={() => setStep("schedule")}
                       className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                     >
                       Back

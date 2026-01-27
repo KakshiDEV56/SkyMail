@@ -1,36 +1,140 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SkyMail Frontend
 
-## Getting Started
+Next.js frontend for the SkyMail newsletter platform. Handles user authentication, campaign management, template creation, and subscriber lists.
 
-First, run the development server:
+## Setup
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+### Requirements
+- Node.js 18+
+- npm or yarn
+
+### Quick Start
+
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+2. **Configure environment:**
+   ```bash
+   cp .env.example .env.local
+   ```
+   Update `.env.local` with your API URL and Razorpay key.
+
+3. **Start development server:**
+   ```bash
+   npm run dev
+   ```
+
+   Open `http://localhost:3000` in your browser.
+
+## Project Structure
+
+```
+app/                    # Next.js app router
+├── auth/              # Authentication pages
+├── dashboard/         # Main dashboard
+│   ├── campaigns/     # Campaign management
+│   ├── subscribers/   # Subscriber lists
+│   └── templates/     # Email templates
+├── landing/           # Landing page
+└── page.tsx           # Home page
+
+components/           # Reusable React components
+├── dashboard/        # Dashboard components
+├── templates/        # Template editor
+├── profile/          # User profile
+└── ui/              # UI components
+
+lib/                 # Utilities
+├── api/             # API client functions
+├── hooks/           # Custom React hooks
+└── utils/           # Helper functions
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Available Scripts
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run dev      # Start dev server with hot reload
+npm run build    # Build for production
+npm start        # Run production build
+npm run lint     # Run ESLint
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Key Features
 
-## Learn More
+- **Authentication:** Company registration, login with JWT
+- **Dashboard:** Overview of campaigns and subscribers
+- **Campaigns:** Create, schedule, reschedule, and cancel campaigns
+- **Templates:** Create email templates with variable placeholders
+- **Subscribers:** Import and manage subscriber lists
+- **Profile:** Update company information and profile picture
+- **Responsive:** Works on desktop, tablet, and mobile
 
-To learn more about Next.js, take a look at the following resources:
+## Template Variables
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+When creating templates, use these variables:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**System variables (auto-filled):**
+- `{{company_name}}` - Your company name
+- `{{website_url}}` - Your website
+- `{{subscriber_email}}` - Subscriber's email
+- `{{subscriber_username}}` - Subscriber's name
+- `{{template_asset}}` - Asset URLs (comma-separated)
 
-## Deploy on Vercel
+**Custom variables:**
+- Define in campaign constants
+- Example: `{{discount}}`, `{{offer_code}}`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## API Integration
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The frontend communicates with the backend API at `NEXT_PUBLIC_API_URL`. Common endpoints:
+
+- `POST /api/auth/register` - Company signup
+- `POST /api/auth/login` - Login
+- `GET/POST /api/campaigns/` - Manage campaigns
+- `GET/POST /api/newsletters/templates/` - Email templates
+- `GET/POST /api/subscribers/` - Subscriber lists
+
+See backend API docs at `/api/docs` for full details.
+
+## Environment Variables
+
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_RAZORPAY_KEY_ID=your_razorpay_public_key
+NEXT_PUBLIC_RAZORPAY_CURRENCY=INR
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+## Common Issues
+
+**Campaigns not showing up:**
+- Ensure backend is running at NEXT_PUBLIC_API_URL
+- Check browser console for API errors
+- Verify authentication token is stored
+
+**Template preview not updating:**
+- Refresh the page
+- Check that variables match your custom constants
+
+**File uploads failing:**
+- Verify AWS S3 bucket is configured
+- Check S3 permissions
+- Ensure file size is under 5MB
+
+## Development
+
+The app uses:
+- **Next.js 14** with App Router
+- **TypeScript** for type safety
+- **Tailwind CSS** for styling
+- **React Query** for API caching
+- **Lucide React** for icons
+
+To add a new page:
+```bash
+# Create app/dashboard/new-feature/page.tsx
+```
+
+Changes auto-reload without manual refresh.

@@ -75,51 +75,25 @@ export function TemplateViewer({ templateId, onBack }: TemplateViewerProps) {
       </div>
 
       {/* Variables - Show as Metadata List ONLY */}
-      {template.variables && (
-        (() => {
-          let variableList: string[] = [];
-          
-          // Parse variables from any format to array
-          if (Array.isArray(template.variables)) {
-            variableList = template.variables.filter((v) => typeof v === "string");
-          } else if (typeof template.variables === "string") {
-            try {
-              const parsed = JSON.parse(template.variables);
-              if (Array.isArray(parsed)) {
-                variableList = parsed.filter((v) => typeof v === "string");
-              } else {
-                variableList = [];
-              }
-            } catch (e) {
-              // If not JSON, try comma-separated
-              variableList = (template.variables as string)
-                .split(",")
-                .map((v: string) => v.trim())
-                .filter((v: string) => v);
-            }
-          }
-          
-          return variableList.length > 0 ? (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Required Variables
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                These variables will be replaced with actual data when sending campaigns.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {variableList.map((variable: string, index: number) => (
-                  <span
-                    key={index}
-                    className="px-3 py-1 bg-white border border-blue-300 text-blue-700 rounded-lg text-sm font-mono"
-                  >
-                    {variable}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : null;
-        })()
+      {template.constants && template.constants.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Required Variables
+          </h3>
+          <p className="text-sm text-gray-600 mb-4">
+            These variables will be replaced with actual data when sending campaigns.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {template.constants.map((variable: string, index: number) => (
+              <span
+                key={index}
+                className="px-3 py-1 bg-white border border-blue-300 text-blue-700 rounded-lg text-sm font-mono"
+              >
+                {variable}
+              </span>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* HTML Template Source - Show as code, not rendered */}
